@@ -19,7 +19,7 @@ class McrpUtil {
         key: string | undefined,
         exclude: string[]
     ): void {
-        const alwaysExclude = ["manifest.json", "pack_icon.png", "bug_pack_icon.png"];
+        const alwaysExclude = ["manifest.json", "pack_icon.png", "bug_pack_icon.png", ".git/", ".github/", ".idea/"];
         const resolvedExclude = [...alwaysExclude, ...exclude];
 
         const keyBuffer = key ? Buffer.from(key, "utf-8") : Buffer.from(crypto.randomBytes(16).toString("hex").slice(0, 32));
