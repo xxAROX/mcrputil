@@ -8,7 +8,7 @@ import { Dirent, copyFileSync, existsSync, mkdirSync, readdirSync, readFileSync,
 //#endregion
 
 //#region Resource-Pack API Stuff:
-interface Manifest { header: { uuid: string } }
+interface Manifest { header: { name: string; uuid: string } }
 interface Content { content: ContentEntry[] }
 interface ContentEntry { path: string; key?: string; }
 
@@ -56,6 +56,7 @@ class McrpUtil {
         const encryptedContent = this.aesEncrypt(keyBuffer, Buffer.from(JSON.stringify(content)));
         const contentsJsonPath = path.join(outputDir, "contents.json");
         writeFileSync(contentsJsonPath, encryptedContent);
+        writeFileSync(path.join(outputDir, path.basename(outputDir) + ".key"), keyBuffer.toString());
         console.log(`Encryption finished. Key: ${keyBuffer.toString("utf-8")}`);
     }
     static decrypt(inputDir: string, outputDir: string, key: string): void {

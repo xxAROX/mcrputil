@@ -41,7 +41,7 @@ const crypto = __importStar(require("node:crypto"));
 const node_fs_1 = require("node:fs");
 class McrpUtil {
     static encrypt(inputDir, outputDir, key, exclude) {
-        const alwaysExclude = ["manifest.json", "pack_icon.png", "bug_pack_icon.png"];
+        const alwaysExclude = ["manifest.json", "pack_icon.png", "bug_pack_icon.png", ".git/", ".github/", ".idea/"];
         const resolvedExclude = [...alwaysExclude, ...exclude];
         const keyBuffer = key ? Buffer.from(key, "utf-8") : Buffer.from(crypto.randomBytes(16).toString("hex").slice(0, 32));
         if (keyBuffer.length !== 32)
@@ -81,6 +81,8 @@ class McrpUtil {
         const encryptedContent = this.aesEncrypt(keyBuffer, Buffer.from(JSON.stringify(content)));
         const contentsJsonPath = path.join(outputDir, "contents.json");
         (0, node_fs_1.writeFileSync)(contentsJsonPath, encryptedContent);
+        (0, node_fs_1.writeFileSync)(path.join(outputDir, path.basename(outputDir) + ".key"), keyBuffer.toString());
+        // make the outputDir to a zip file:
         console.log(`Encryption finished. Key: ${keyBuffer.toString("utf-8")}`);
     }
     static decrypt(inputDir, outputDir, key) {
