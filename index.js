@@ -33,14 +33,10 @@ var __importStar = (this && this.__importStar) || (function () {
         return result;
     };
 })();
-var __importDefault = (this && this.__importDefault) || function (mod) {
-    return (mod && mod.__esModule) ? mod : { "default": mod };
-};
 Object.defineProperty(exports, "__esModule", { value: true });
 const path = __importStar(require("node:path"));
 const crypto = __importStar(require("node:crypto"));
-const glob_1 = __importDefault(require("glob"));
-const fs = __importStar(require("fs-extra"));
+const node_fs_1 = require("node:fs");
 class McrpUtil {
     static encrypt(inputDir, outputDir, key, exclude) {
         const alwaysExclude = ["manifest.json", "pack_icon.png", "bug_pack_icon.png"];
@@ -48,32 +44,32 @@ class McrpUtil {
         const keyBuffer = key ? Buffer.from(key, "utf-8") : crypto.randomBytes(32);
         if (keyBuffer.length !== 32)
             throw new Error("Key must be 32 bytes long.");
-        fs.ensureDirSync(outputDir);
+        ensureDirSync(outputDir);
         const manifestPath = path.join(inputDir, "manifest.json");
-        if (!fs.existsSync(manifestPath))
+        if (!(0, node_fs_1.existsSync)(manifestPath))
             throw new Error("manifest.json not found in the input directory.");
-        const manifest = JSON.parse(fs.readFileSync(manifestPath, "utf-8"));
+        const manifest = JSON.parse((0, node_fs_1.readFileSync)(manifestPath, "utf-8"));
         const contentEntries = [];
-        glob_1.default.sync(`${inputDir}/**/*`).forEach((file) => {
+        globSync(`${inputDir}/**/*`).forEach((file) => {
             const relativePath = path.relative(inputDir, file).replace(/\\/g, "/");
             const outputPath = path.join(outputDir, relativePath);
-            if (fs.statSync(file).isDirectory())
+            if ((0, node_fs_1.statSync)(file).isDirectory())
                 return;
-            fs.ensureDirSync(path.dirname(outputPath));
+            ensureDirSync(path.dirname(outputPath));
             if (resolvedExclude.some((pattern) => relativePath.match(pattern))) {
                 if (relativePath.endsWith(".json")) {
-                    const content = JSON.parse(fs.readFileSync(file, "utf-8"));
-                    fs.writeFileSync(outputPath, JSON.stringify(content));
+                    const content = JSON.parse((0, node_fs_1.readFileSync)(file, "utf-8"));
+                    (0, node_fs_1.writeFileSync)(outputPath, JSON.stringify(content));
                 }
                 else
-                    fs.copyFileSync(file, outputPath);
+                    (0, node_fs_1.copyFileSync)(file, outputPath);
                 console.log(`Copied ${relativePath}`);
                 contentEntries.push({ path: relativePath });
             }
             else {
-                const fileBuffer = fs.readFileSync(file);
+                const fileBuffer = (0, node_fs_1.readFileSync)(file);
                 const encryptedBuffer = this.aesEncrypt(keyBuffer, fileBuffer);
-                fs.writeFileSync(outputPath, encryptedBuffer);
+                (0, node_fs_1.writeFileSync)(outputPath, encryptedBuffer);
                 console.log(`Encrypted ${relativePath}`);
                 const entryKey = crypto.randomBytes(32).toString("utf-8");
                 contentEntries.push({ path: relativePath, key: entryKey });
@@ -82,56 +78,88 @@ class McrpUtil {
         const content = { content: contentEntries };
         const encryptedContent = this.aesEncrypt(keyBuffer, Buffer.from(JSON.stringify(content)));
         const contentsJsonPath = path.join(outputDir, "contents.json");
-        fs.writeFileSync(contentsJsonPath, encryptedContent);
+        (0, node_fs_1.writeFileSync)(contentsJsonPath, encryptedContent);
         console.log(`Encryption finished. Key: ${keyBuffer.toString("utf-8")}`);
     }
     static decrypt(inputDir, outputDir, key) {
         const keyBuffer = Buffer.from(key, "utf-8");
-        if (keyBuffer.length !== 32) {
+        if (keyBuffer.length !== 32)
             throw new Error("Key must be 32 bytes long.");
-        }
         const contentsJsonPath = path.join(inputDir, "contents.json");
-        if (!fs.existsSync(contentsJsonPath)) {
+        if (!(0, node_fs_1.existsSync)(contentsJsonPath))
             throw new Error("contents.json not found in the input directory.");
-        }
-        const encryptedContent = fs.readFileSync(contentsJsonPath);
+        const encryptedContent = (0, node_fs_1.readFileSync)(contentsJsonPath);
         const content = JSON.parse(this.aesDecrypt(keyBuffer, encryptedContent).toString());
         content.content.forEach((entry) => {
             const inputPath = path.join(inputDir, entry.path);
             const outputPath = path.join(outputDir, entry.path);
-            fs.ensureDirSync(path.dirname(outputPath));
+            ensureDirSync(path.dirname(outputPath));
             if (!entry.key) {
                 if (entry.path.endsWith(".json")) {
-                    const content = JSON.parse(fs.readFileSync(inputPath, "utf-8"));
-                    fs.writeFileSync(outputPath, JSON.stringify(content, null, 2));
+                    const content = JSON.parse((0, node_fs_1.readFileSync)(inputPath, "utf-8"));
+                    (0, node_fs_1.writeFileSync)(outputPath, JSON.stringify(content, null, 2));
                 }
-                else {
-                    fs.copyFileSync(inputPath, outputPath);
-                }
+                else
+                    (0, node_fs_1.copyFileSync)(inputPath, outputPath);
                 console.log(`Copied ${entry.path}`);
             }
             else {
-                const fileBuffer = fs.readFileSync(inputPath);
+                const fileBuffer = (0, node_fs_1.readFileSync)(inputPath);
                 const decryptedBuffer = this.aesDecrypt(Buffer.from(entry.key, "utf-8"), fileBuffer);
-                fs.writeFileSync(outputPath, decryptedBuffer);
+                (0, node_fs_1.writeFileSync)(outputPath, decryptedBuffer);
                 console.log(`Decrypted ${entry.path}`);
             }
         });
         console.log("Decryption finished.");
     }
     static aesEncrypt(key, data) {
-        const iv = key.slice(0, 16); // Use the first 16 bytes of the key as the IV
+        const iv = key.subarray(0, 16); // Use the first 16 bytes of the key as the IV
         const cipher = crypto.createCipheriv("aes-256-cbc", key, iv);
         const encrypted = Buffer.concat([cipher.update(data), cipher.final()]);
         return encrypted;
     }
     static aesDecrypt(key, encryptedData) {
-        const iv = key.slice(0, 16); // Use the first 16 bytes of the key as the IV
+        const iv = key.subarray(0, 16); // Use the first 16 bytes of the key as the IV
         const decipher = crypto.createDecipheriv("aes-256-cbc", key, iv);
         const decrypted = Buffer.concat([decipher.update(encryptedData), decipher.final()]);
         return decrypted;
     }
 }
+//#region API Stuff:
+function globSync(pattern, directory = process.cwd()) {
+    const regexPattern = convertGlobToRegex(pattern);
+    const results = [];
+    function traverse(dir) {
+        const entries = (0, node_fs_1.readdirSync)(dir, { withFileTypes: true });
+        for (const entry of entries) {
+            const fullPath = path.join(dir, entry.name);
+            const relativePath = path.relative(directory, fullPath);
+            if (entry.isDirectory())
+                traverse(fullPath); // Recurse into subdirectory
+            else if (regexPattern.test(relativePath))
+                results.push(relativePath);
+        }
+    }
+    traverse(directory);
+    return results;
+}
+function convertGlobToRegex(glob) {
+    const escaped = glob
+        .replace(/[-/\\^$+?.()|[\]{}]/g, "\\$&") // Escape special regex characters
+        .replace(/\*\*/g, "(?:.*)") // Match zero or more directories
+        .replace(/\*/g, "[^/]*"); // Match zero or more characters in a directory
+    return new RegExp(`^${escaped}$`);
+}
+function ensureDirSync(dirPath) {
+    if ((0, node_fs_1.existsSync)(dirPath)) {
+        if (!(0, node_fs_1.statSync)(dirPath).isDirectory())
+            throw new Error(`Path exists but is not a directory: ${dirPath}`);
+        return;
+    }
+    ensureDirSync(path.dirname(dirPath));
+    (0, node_fs_1.mkdirSync)(dirPath);
+}
+//#endregion
 const args = process.argv.slice(2);
 switch (args[0].toLowerCase()) {
     case "encrypt": {
