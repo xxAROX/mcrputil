@@ -1,5 +1,5 @@
 {
-  "name": "@xxarox/mcrputil",
+  "name": "@xx_arox/mcrputil",
   "version": "1.0.0",
   "bin": "./index.js",
   "scripts": {
