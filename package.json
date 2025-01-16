@@ -6,8 +6,6 @@
     "build": "tsc --project tsconfig.json"
   },
   "author": "xxAROX",
-  "license": "ISC",
-  "description": "",
   "dependencies": {
     "fs-extra": "^11.3.0",
     "glob": "^11.0.1"
