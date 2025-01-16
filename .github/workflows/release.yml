@@ -17,23 +17,13 @@ jobs:
         with:
           node-version: '20'
 
-      - name: "Create Release"
-        id: create_release
-        uses: actions/create-release@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          tag_name: "latest"
-          release_name: Latest release
-          draft: false
-          prerelease: false
+      - name: Set up Node.js
+        run: cp index.js mcrputil
 
-      - name: Upload Asset
-        uses: actions/upload-release-asset@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Create and Publish Release
+        uses: softprops/action-gh-release@v1
         with:
-          upload_url: ${{ steps.create_release.outputs.upload_url }}
-          asset_path: ./index.js
-          asset_name: mcrputil
-          asset_content_type: application/javascript
+          generate_release_notes: false
+          tag_name: "latest"
+          name: "Latest release"
+          files: "mcrputil"
