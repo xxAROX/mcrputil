@@ -1,13 +1,11 @@
 {
-  "name": "mcrputil",
+  "name": "@xxarox/mcrputil",
   "version": "1.0.0",
-  "main": "index.js",
-  "bin": "./.dist/index.js",
+  "bin": "./index.js",
   "scripts": {
     "build": "tsc --project tsconfig.json"
   },
-  "keywords": [],
-  "author": "",
+  "author": "xxAROX",
   "license": "ISC",
   "description": "",
   "dependencies": {
