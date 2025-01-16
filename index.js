@@ -34,6 +34,7 @@ var __importStar = (this && this.__importStar) || (function () {
     };
 })();
 Object.defineProperty(exports, "__esModule", { value: true });
+//#region Imports:
 const path = __importStar(require("node:path"));
 const crypto = __importStar(require("node:crypto"));
 const node_fs_1 = require("node:fs");
@@ -125,7 +126,8 @@ class McrpUtil {
         return decrypted;
     }
 }
-//#region API Stuff:
+//#endregion
+//#region Core API Stuff:
 function globSync(pattern, directory = process.cwd()) {
     const regexPattern = convertGlobToRegex(pattern);
     const results = [];
@@ -160,6 +162,7 @@ function ensureDirSync(dirPath) {
     (0, node_fs_1.mkdirSync)(dirPath);
 }
 //#endregion
+//#region Command Line Interface:
 const args = process.argv.slice(2);
 switch (args[0].toLowerCase()) {
     case "encrypt": {
@@ -182,3 +185,4 @@ switch (args[0].toLowerCase()) {
         console.log("  decrypt <inputDir> <outputDir> <key>");
     }
 }
+//#endregion

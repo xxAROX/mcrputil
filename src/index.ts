@@ -1,13 +1,15 @@
 #!/usr/bin/env node
 
+//#region Imports:
 import * as path from "node:path";
 import * as crypto from "node:crypto";
 import { copyFileSync, existsSync, mkdirSync, readdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
+//#endregion
 
+//#region Resource-Pack API Stuff:
 interface Manifest { header: { uuid: string } }
 interface Content { content: ContentEntry[] }
 interface ContentEntry { path: string; key?: string; }
-
 class McrpUtil {
     static encrypt(
         inputDir: string,
@@ -92,8 +94,9 @@ class McrpUtil {
         return decrypted;
     }
 }
+//#endregion
 
-//#region API Stuff:
+//#region Core API Stuff:
 function globSync(pattern: string, directory: string = process.cwd()): string[] {
     const regexPattern = convertGlobToRegex(pattern);
     const results: string[] = [];
@@ -128,6 +131,7 @@ function ensureDirSync(dirPath: string): void {
 }
 //#endregion
 
+//#region Command Line Interface:
 const args = process.argv.slice(2);
 switch (args[0].toLowerCase()) {
     case "encrypt": {
@@ -151,4 +155,4 @@ switch (args[0].toLowerCase()) {
         console.log("  decrypt <inputDir> <outputDir> <key>");
     }
 }
-
+//#endregion
