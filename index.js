@@ -34,6 +34,7 @@ var __importStar = (this && this.__importStar) || (function () {
     };
 })();
 Object.defineProperty(exports, "__esModule", { value: true });
+exports.globSync = globSync;
 //#region Imports:
 const path = __importStar(require("node:path"));
 const crypto = __importStar(require("node:crypto"));
@@ -42,7 +43,7 @@ class McrpUtil {
     static encrypt(inputDir, outputDir, key, exclude) {
         const alwaysExclude = ["manifest.json", "pack_icon.png", "bug_pack_icon.png"];
         const resolvedExclude = [...alwaysExclude, ...exclude];
-        const keyBuffer = key ? Buffer.from(key, "utf-8") : crypto.randomBytes(32);
+        const keyBuffer = key ? Buffer.from(key, "utf-8") : Buffer.from(crypto.randomBytes(16).toString("hex").slice(0, 32));
         if (keyBuffer.length !== 32)
             throw new Error("Key must be 32 bytes long.");
         ensureDirSync(outputDir);
@@ -128,29 +129,30 @@ class McrpUtil {
 }
 //#endregion
 //#region Core API Stuff:
-function globSync(pattern, directory = process.cwd()) {
-    const regexPattern = convertGlobToRegex(pattern);
-    const results = [];
-    function traverse(dir) {
-        const entries = (0, node_fs_1.readdirSync)(dir, { withFileTypes: true });
-        for (const entry of entries) {
-            const fullPath = path.join(dir, entry.name);
-            const relativePath = path.relative(directory, fullPath);
-            if (entry.isDirectory())
-                traverse(fullPath); // Recurse into subdirectory
-            else if (regexPattern.test(relativePath))
-                results.push(relativePath);
-        }
+function globSync(pattern) {
+    const normalizedPattern = path.resolve(pattern);
+    const segments = normalizedPattern.split(path.sep);
+    const starIndex = segments.indexOf("**");
+    if (starIndex === -1)
+        throw new Error("The pattern must contain '**' to indicate recursive search.");
+    const baseDir = segments.slice(0, starIndex).join(path.sep);
+    const restPattern = segments.slice(starIndex + 1);
+    const matchedFiles = [];
+    function isMatch(fileName, patternParts) {
+        if (patternParts.length === 0)
+            return true;
+        const [first, ...rest] = patternParts;
+        if (first === "**")
+            return true;
+        else if (first === "*")
+            return true;
+        else
+            return fileName === first;
     }
-    traverse(directory);
-    return results;
-}
-function convertGlobToRegex(glob) {
-    const escaped = glob
-        .replace(/[-/\\^$+?.()|[\]{}]/g, "\\$&") // Escape special regex characters
-        .replace(/\*\*/g, "(?:.*)") // Match zero or more directories
-        .replace(/\*/g, "[^/]*"); // Match zero or more characters in a directory
-    return new RegExp(`^${escaped}$`);
+    const entries = (0, node_fs_1.readdirSync)(baseDir, { withFileTypes: true, recursive: true });
+    for (const entry of entries.filter(e => isMatch(e.name, restPattern)))
+        matchedFiles.push(path.join(baseDir, entry.path.replace(baseDir, ""), entry.name)); // Join to get the full path
+    return matchedFiles;
 }
 function ensureDirSync(dirPath) {
     if ((0, node_fs_1.existsSync)(dirPath)) {
@@ -164,12 +166,13 @@ function ensureDirSync(dirPath) {
 //#endregion
 //#region Command Line Interface:
 const args = process.argv.slice(2);
-switch (args[0].toLowerCase()) {
+switch (args[0]?.toLowerCase()) {
     case "encrypt": {
         const inputDir = args[1];
         const outputDir = args[2];
         const key = args[3];
         const exclude = args.slice(4);
+        McrpUtil.encrypt(inputDir, outputDir, key, exclude);
         break;
     }
     case "decrypt": {

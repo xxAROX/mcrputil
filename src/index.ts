@@ -3,13 +3,15 @@
 //#region Imports:
 import * as path from "node:path";
 import * as crypto from "node:crypto";
-import { copyFileSync, existsSync, mkdirSync, readdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
+import { Dirent, copyFileSync, existsSync, mkdirSync, readdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
+
 //#endregion
 
 //#region Resource-Pack API Stuff:
 interface Manifest { header: { uuid: string } }
 interface Content { content: ContentEntry[] }
 interface ContentEntry { path: string; key?: string; }
+
 class McrpUtil {
     static encrypt(
         inputDir: string,
@@ -19,14 +21,16 @@ class McrpUtil {
     ): void {
         const alwaysExclude = ["manifest.json", "pack_icon.png", "bug_pack_icon.png"];
         const resolvedExclude = [...alwaysExclude, ...exclude];
-        const keyBuffer = key ? Buffer.from(key, "utf-8") : crypto.randomBytes(32);
+
+        const keyBuffer = key ? Buffer.from(key, "utf-8") : Buffer.from(crypto.randomBytes(16).toString("hex").slice(0, 32));
         if (keyBuffer.length !== 32) throw new Error("Key must be 32 bytes long.");
         ensureDirSync(outputDir);
         const manifestPath = path.join(inputDir, "manifest.json");
         if (!existsSync(manifestPath)) throw new Error("manifest.json not found in the input directory.");
         const manifest: Manifest = JSON.parse(readFileSync(manifestPath, "utf-8"));
         const contentEntries: ContentEntry[] = [];
-        globSync(`${inputDir}/**/*`).forEach((file) => {
+
+        globSync(`${inputDir}/**/*`).forEach((file: string) => {
             const relativePath = path.relative(inputDir, file).replace(/\\/g, "/");
             const outputPath = path.join(outputDir, relativePath);
             if (statSync(file).isDirectory()) return;
@@ -97,28 +101,25 @@ class McrpUtil {
 //#endregion
 
 //#region Core API Stuff:
-function globSync(pattern: string, directory: string = process.cwd()): string[] {
-    const regexPattern = convertGlobToRegex(pattern);
-    const results: string[] = [];
-    function traverse(dir: string) {
-        const entries = readdirSync(dir, { withFileTypes: true });
-        for (const entry of entries) {
-            const fullPath = path.join(dir, entry.name);
-            const relativePath = path.relative(directory, fullPath);
-            if (entry.isDirectory()) traverse(fullPath); // Recurse into subdirectory
-            else if (regexPattern.test(relativePath)) results.push(relativePath);
-        }
-    }
-    traverse(directory);
-    return results;
-}
+export function globSync(pattern: string): string[] {
+    const normalizedPattern = path.resolve(pattern);
+    const segments = normalizedPattern.split(path.sep);
+    const starIndex = segments.indexOf("**");
+    if (starIndex === -1) throw new Error("The pattern must contain '**' to indicate recursive search.");
+    const baseDir = segments.slice(0, starIndex).join(path.sep);
+    const restPattern = segments.slice(starIndex + 1);
+    const matchedFiles: string[] = [];
 
-function convertGlobToRegex(glob: string): RegExp {
-    const escaped = glob
-        .replace(/[-/\\^$+?.()|[\]{}]/g, "\\$&") // Escape special regex characters
-        .replace(/\*\*/g, "(?:.*)") // Match zero or more directories
-        .replace(/\*/g, "[^/]*"); // Match zero or more characters in a directory
-    return new RegExp(`^${escaped}$`);
+    function isMatch(fileName: string, patternParts: string[]): boolean {
+        if (patternParts.length === 0) return true;
+        const [first, ...rest] = patternParts;
+        if (first === "**") return true;
+        else if (first === "*") return true;
+        else return fileName === first;
+    }
+    const entries: Dirent[] = readdirSync(baseDir, { withFileTypes: true, recursive: true });
+    for (const entry of entries.filter(e => isMatch(e.name, restPattern))) matchedFiles.push(path.join(baseDir, entry.path.replace(baseDir, ""), entry.name)); // Join to get the full path
+    return matchedFiles;
 }
 
 function ensureDirSync(dirPath: string): void {
@@ -133,19 +134,19 @@ function ensureDirSync(dirPath: string): void {
 
 //#region Command Line Interface:
 const args = process.argv.slice(2);
-switch (args[0].toLowerCase()) {
+switch (args[0]?.toLowerCase()) {
     case "encrypt": {
         const inputDir = args[1];
         const outputDir = args[2];
         const key = args[3];
         const exclude = args.slice(4);
+        McrpUtil.encrypt(inputDir, outputDir, key, exclude);
         break;
     }
     case "decrypt": {
         const inputDir = args[1];
         const outputDir = args[2];
         const key = args[3];
-    
         McrpUtil.decrypt(inputDir, outputDir, key);
         break
     }
