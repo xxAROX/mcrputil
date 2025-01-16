@@ -1,0 +1,21 @@
+{
+  "name": "mcrputil",
+  "version": "1.0.0",
+  "main": "index.js",
+  "bin": "./.dist/index.js",
+  "scripts": {
+    "build": "tsc --project tsconfig.json"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "description": "",
+  "dependencies": {
+    "fs-extra": "^11.3.0",
+    "glob": "^11.0.1"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "typescript": "^5.7.3"
+  }
+}
