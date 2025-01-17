@@ -18,7 +18,7 @@ class McrpUtil {
     }
     static encrypt(inputDir: string, outputDir: string, exclude: string[]): void{
         const ignore = [".git/", ".github/", ".idea/"];
-        const alwaysExclude = ["manifest.json", "pack_icon.png", "bug_pack_icon.png"];
+        const alwaysExclude = ["manifest.json", "pack_icon.png", "bug_pack_icon.png", "LICENSE"];
         const resolvedExclude = [...alwaysExclude, ...exclude];
 
         const keyBuffer = this.createKey();
