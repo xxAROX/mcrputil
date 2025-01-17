@@ -18,14 +18,11 @@ class McrpUtil {
     }
     static encrypt(inputDir: string, outputDir: string, exclude: string[]): void{
         const ignore = [".git/", ".github/", ".idea/"];
-        const alwaysExclude = ["manifest.json", "pack_icon.png", "bug_pack_icon.png", "LICENSE"];
+        const alwaysExclude = ["manifest.json", "pack_icon.png", "bug_pack_icon.png", "LICENSE", "README.md"];
         const resolvedExclude = [...alwaysExclude, ...exclude];
-
         const keyBuffer = this.createKey();
-        console.log(keyBuffer.toString(), keyBuffer.length);
-        
         if (keyBuffer.length !== 32) throw new Error("Key must be 32 bytes long.");
-        rmSync(outputDir, {recursive: true});
+        if (existsSync(outputDir)) rmSync(outputDir, {recursive: true});
         ensureDirSync(outputDir);
         const manifestPath = path.join(inputDir, "manifest.json");
         if (!existsSync(manifestPath)) throw new Error("manifest.json not found in the input directory.");
@@ -36,7 +33,7 @@ class McrpUtil {
             const relativePath = path.relative(inputDir, file).replace(/\\/g, "/");
             const outputPath = path.join(outputDir, relativePath);
             if (statSync(file).isDirectory()) return;
-            if (ignore.some(i => file.startsWith(i))) return;
+            if (ignore.some(i => relativePath.replace("\\", "/").startsWith(i.replace("\\", "/")))) return;
             ensureDirSync(path.dirname(outputPath));
             if (resolvedExclude.some((pattern) => relativePath.match(pattern))) {
                 if (relativePath.endsWith(".json")) {
