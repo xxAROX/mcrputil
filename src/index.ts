@@ -3,7 +3,7 @@
 //#region Imports:
 import * as path from "node:path";
 import * as crypto from "node:crypto";
-import { Dirent, copyFileSync, existsSync, mkdirSync, readdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
+import { Dirent, copyFileSync, existsSync, mkdirSync, readdirSync, readFileSync, statSync, writeFileSync, rmdirSync, rmSync } from "node:fs";
 
 //#endregion
 
@@ -13,17 +13,19 @@ interface Content { content: ContentEntry[] }
 interface ContentEntry { path: string; key?: string; }
 
 class McrpUtil {
-    static encrypt(
-        inputDir: string,
-        outputDir: string,
-        key: string | undefined,
-        exclude: string[]
-    ): void {
-        const alwaysExclude = ["manifest.json", "pack_icon.png", "bug_pack_icon.png", ".git/", ".github/", ".idea/"];
+    static createKey(): Buffer{
+        return Buffer.from(crypto.randomBytes(32).toString("hex").slice(0, 32), "utf-8");
+    }
+    static encrypt(inputDir: string, outputDir: string, exclude: string[]): void{
+        const ignore = [".git/", ".github/", ".idea/"];
+        const alwaysExclude = ["manifest.json", "pack_icon.png", "bug_pack_icon.png"];
         const resolvedExclude = [...alwaysExclude, ...exclude];
 
-        const keyBuffer = key ? Buffer.from(key, "utf-8") : Buffer.from(crypto.randomBytes(16).toString("hex").slice(0, 32));
+        const keyBuffer = this.createKey();
+        console.log(keyBuffer.toString(), keyBuffer.length);
+        
         if (keyBuffer.length !== 32) throw new Error("Key must be 32 bytes long.");
+        rmSync(outputDir, {recursive: true});
         ensureDirSync(outputDir);
         const manifestPath = path.join(inputDir, "manifest.json");
         if (!existsSync(manifestPath)) throw new Error("manifest.json not found in the input directory.");
@@ -34,6 +36,7 @@ class McrpUtil {
             const relativePath = path.relative(inputDir, file).replace(/\\/g, "/");
             const outputPath = path.join(outputDir, relativePath);
             if (statSync(file).isDirectory()) return;
+            if (ignore.some(i => file.startsWith(i))) return;
             ensureDirSync(path.dirname(outputPath));
             if (resolvedExclude.some((pattern) => relativePath.match(pattern))) {
                 if (relativePath.endsWith(".json")) {
@@ -44,12 +47,11 @@ class McrpUtil {
                 contentEntries.push({ path: relativePath });
             } else {
                 const fileBuffer = readFileSync(file);
-                const encryptedBuffer = this.aesEncrypt(keyBuffer, fileBuffer);
+                const entryKey = this.createKey();
+                const encryptedBuffer = this.aesEncrypt(entryKey, fileBuffer);
                 writeFileSync(outputPath, encryptedBuffer);
                 console.log(`Encrypted ${relativePath}`);
-
-                const entryKey = crypto.randomBytes(32).toString("utf-8");
-                contentEntries.push({ path: relativePath, key: entryKey });
+                contentEntries.push({ path: relativePath, key: entryKey.toString("utf-8") });
             }
         });
         const content: Content = { content: contentEntries };
@@ -57,46 +59,13 @@ class McrpUtil {
         const contentsJsonPath = path.join(outputDir, "contents.json");
         writeFileSync(contentsJsonPath, encryptedContent);
         writeFileSync(path.join(outputDir, path.basename(outputDir) + ".key"), keyBuffer.toString());
-        console.log(`Encryption finished. Key: ${keyBuffer.toString("utf-8")}`);
-    }
-    static decrypt(inputDir: string, outputDir: string, key: string): void {
-        const keyBuffer = Buffer.from(key, "utf-8");
-        if (keyBuffer.length !== 32) throw new Error("Key must be 32 bytes long.");
-        const contentsJsonPath = path.join(inputDir, "contents.json");
-        if (!existsSync(contentsJsonPath)) throw new Error("contents.json not found in the input directory.");
-        const encryptedContent = readFileSync(contentsJsonPath);
-        const content: Content = JSON.parse(this.aesDecrypt(keyBuffer, encryptedContent).toString());
-        content.content.forEach((entry) => {
-            const inputPath = path.join(inputDir, entry.path);
-            const outputPath = path.join(outputDir, entry.path);
-            ensureDirSync(path.dirname(outputPath));
-
-            if (!entry.key) {
-                if (entry.path.endsWith(".json")) {
-                    const content = JSON.parse(readFileSync(inputPath, "utf-8"));
-                    writeFileSync(outputPath, JSON.stringify(content, null, 2));
-                } else copyFileSync(inputPath, outputPath);
-                console.log(`Copied ${entry.path}`);
-            } else {
-                const fileBuffer = readFileSync(inputPath);
-                const decryptedBuffer = this.aesDecrypt(Buffer.from(entry.key, "utf-8"), fileBuffer);
-                writeFileSync(outputPath, decryptedBuffer);
-                console.log(`Decrypted ${entry.path}`);
-            }
-        });
-        console.log("Decryption finished.");
+        console.log(`Encryption finished! Key: ${keyBuffer.toString("utf-8")}`);
     }
     static aesEncrypt(key: Buffer, data: Buffer): Buffer {
         const iv = key.subarray(0, 16); // Use the first 16 bytes of the key as the IV
         const cipher = crypto.createCipheriv("aes-256-cbc", key, iv);
         const encrypted = Buffer.concat([cipher.update(data), cipher.final()]);
         return encrypted;
-    }
-    static aesDecrypt(key: Buffer, encryptedData: Buffer): Buffer {
-        const iv = key.subarray(0, 16); // Use the first 16 bytes of the key as the IV
-        const decipher = crypto.createDecipheriv("aes-256-cbc", key, iv);
-        const decrypted = Buffer.concat([decipher.update(encryptedData), decipher.final()]);
-        return decrypted;
     }
 }
 //#endregion
@@ -139,22 +108,18 @@ switch (args[0]?.toLowerCase()) {
     case "encrypt": {
         const inputDir = args[1];
         const outputDir = args[2];
-        const key = args[3];
-        const exclude = args.slice(4);
-        McrpUtil.encrypt(inputDir, outputDir, key, exclude);
+        const exclude = args.slice(3);
+        McrpUtil.encrypt(inputDir, outputDir, exclude);
         break;
     }
     case "decrypt": {
-        const inputDir = args[1];
-        const outputDir = args[2];
-        const key = args[3];
-        McrpUtil.decrypt(inputDir, outputDir, key);
-        break
+        console.log("Decrypting is against the terms of microsoft!");
+        process.exit(1);
+        break;
     }
     default: {
-        console.log("Usage:");
-        console.log("  encrypt <inputDir> <outputDir> <key?> <excludePatterns...>");
-        console.log("  decrypt <inputDir> <outputDir> <key>");
+        console.info("Usage:");
+        console.info("  encrypt <inputDir> <outputDir> [excluded files...]");
     }
 }
 //#endregion
