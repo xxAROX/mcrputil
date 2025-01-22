@@ -109,11 +109,6 @@ switch (args[0]?.toLowerCase()) {
         McrpUtil.encrypt(inputDir, outputDir, exclude);
         break;
     }
-    case "decrypt": {
-        console.log("Decrypting is against the terms of microsoft!");
-        process.exit(1);
-        break;
-    }
     default: {
         console.info("Usage:");
         console.info("  encrypt <inputDir> <outputDir> [excluded files...]");
